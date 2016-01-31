@@ -1,10 +1,27 @@
 "use strict";
 var EventEmitter = require('events').EventEmitter;
 var util = require('util');
-function Protocol() {
-
+function Protocol($config) {
+    this.config = $config;
+    var self = this;
     this.clients = {};
     this.commands = {};
+    if ($config.pingInterval > 0 && $config.pingInterval > 0) {
+        this.addCommand('pong', function (client) {
+//            console.log(self.constructor.name,'pong')
+            clearTimeout(client.pingTimeoutHandle);
+        });
+        //если надо пинговать - заводим таймаут пинга
+
+        self.pingIntervalHandle = setInterval(function () {
+            for (var i in self.clients) {
+                var client = self.clients[i];
+                client.send({cmd: 'ping'});
+                self.refreshPingTimeoutHandle(client);
+            }
+        }, self.config.pingInterval);
+    }
+
 }
 
 util.inherits(Protocol, EventEmitter);
@@ -34,6 +51,16 @@ Protocol.prototype.getClient = function (token) {
     return this.clients[token];
 };
 
+Protocol.prototype.refreshPingTimeoutHandle = function (client) {
+    var self = this;
+    clearTimeout(client.pingTimeoutHandle);
+    client.pingTimeoutHandle = setTimeout(function () {
+        //не успел ответить на пинг - закрыли соединение
+        client.connection.close(1000);
+//        console.log(self.constructor.name, "closed by timeout");
+    }, 1000);//сенадо именно столько, 1 секунды на пинг вполне достаточно
+}
+
 /**
  * принимает обьект типа клиент с методами (send(),close())
  * @function
@@ -44,24 +71,40 @@ Protocol.prototype.getClient = function (token) {
 Protocol.prototype.listenToClient = function (client) {
 //принимает клиента, подписывается на события сокета и выполняет его команды
     var self = this;
-
     var token = client.profile.token;
+//    console.log('token', token);
     if (token) {    //если токены используются
         var another = self.clients[token];
-        if (another) {
-//            console.log('twice login',token)
-            another.send({cmd: 'ping'});
-            clearTimeout(another.pingTimeoutHandle);
-            another.pingTimeoutHandle = setTimeout(function () {
-                another.close(1000);
-            }, 1000);
+        if (another) {//случай, когда 2 клиена с 1 токеном:
+            //возможен если:
+            // 1) подключается читер и честный одновременно
+            //      последнего предупредим о том что токен используется и закроем соединение
+            //      первый если что - отвалится по таймауту
+            //      в данном случае мы не знаем,кто из них настоящий
+
+            // 2) сокет повис на сервере, а на клиенте закрыт - тогда клиент честно переподключается
+            //следовательно надо освободить сокет
+
+            //алгоритм:
+            //старый клиент отвалится по таймауту пинга, автоматически освободив место новому подключению
+            //новый переподключится - все ОК
+
+            self.emit('twice login', token);
+            //если клиента надо постоянно пинговать, заводим интервал пинга
+            // и таймаут закрытия соединения, если клиент не успел ответить
+
             client.send({cmd: 'auth_e_twice_login', code: 'twice token usage'});
             client.close(1000);
             return;
         }
+        //если токен уникален, просто добавляем его в "клиенты"
         self.clients[token] = client;
+    } else {
+        //если без токена, а он нужен - просто закрываем соединение
+        if (self.config.requireToken) {
+            client.connection.close(1000);
+        }
     }
-
 
     setSocketListeners(client.connection);
 
@@ -102,14 +145,11 @@ Protocol.prototype.listenToClient = function (client) {
             clearTimeout(client.pingTimeoutHandle);
             delete client.pingTimeoutHandle;
             //   delete client.profile;
-            delete client.connection;
-            //          console.log('onClose',token)
+            //            delete client.connection;
+
             if (token) {
-//                delete self.clients[token];
                 delete self.clients[token];
             }
-            //       console.log('events', client.connection._events)
-            console.log(self.constructor.name, 'close', Object.keys(self.clients));
         }
 
         /**
@@ -158,6 +198,7 @@ Protocol.prototype.listenToClient = function (client) {
  */
 Protocol.prototype.unbindClient = function (client, eventName) {
 //принимает клиента, отписывается от его событий и удаляет ссылки на него
+//    console.log(eventName, 'client.connection', !!client.connection)
     client.connection.emit('unbind');   //чистим ссылки внитри текущего инстанса протокола
     if (eventName) {
         this.emit(eventName, client);
@@ -171,6 +212,5 @@ Protocol.prototype.broadcast = function (cmd) {
     }
 }
 
-Protocol.prototype.CMD_TWICE_LOGIN
 module.exports = Protocol;
 
