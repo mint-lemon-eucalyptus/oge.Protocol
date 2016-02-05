@@ -43,7 +43,15 @@ Protocol.prototype.getClient = function (token) {
  */
 Protocol.prototype.listenToClient = function (client) {
 //принимает клиента, подписывается на события сокета и выполняет его команды
+    //для совместимости со старыми версиями ConnectionServer будем расширять объект клиента
     var self = this;
+
+    /**
+     * подписываться сразу на события json, dead объекта Client
+     *
+     * если соединение закрывается, просто отписываемся от клиента
+     * если клиента надо передать в другой протокол, генерируем событие client
+     */
 
     var token = client.profile.token;
     if (token) {    //если токены используются
@@ -55,7 +63,7 @@ Protocol.prototype.listenToClient = function (client) {
             another.pingTimeoutHandle = setTimeout(function () {
                 another.close(1000);
             }, 1000);
-            client.send({cmd: 'auth_e_twice_login', code: 'twice token usage'});
+            client.send({cmd: 'twice_login', code: 'twice token usage'});
             client.close(1000);
             return;
         }
@@ -63,89 +71,39 @@ Protocol.prototype.listenToClient = function (client) {
     }
 
 
-    setSocketListeners(client.connection);
+    client.once('dead', onClientConnectionDead);
+    client.on('json', onClientMessage);
 
-    function setSocketListeners(socket) {
-        socket.once('close', onClose);
-        socket.once('error', onError);
-        socket.on('message', onMessage);
-        socket.once('unbind', onUnbind);
-
-        /**
-         * unbinding from handlers
-         * @function
-         */
-        function onUnbind() {
-            //если клиента надо передать другому протоколу
-            this.removeListener('message', onMessage);
-            this.removeListener('error', onError);
-            this.removeListener('close', onClose);
-            clearTimeout(client.pingTimeoutHandle);
+    /**
+     * socket close event handler
+     * @function
+     */
+    function onClientConnectionDead() {
+        //от событий сокета клиент отписался сам!!!
+        //   console.log('events', client.connection._events,client._events);
+        //отписываемся от событий клиента
+        this.removeAllListeners();
+        clearTimeout(client.pingTimeoutHandle);
 //            console.log(self.constructor.name, "unbind", Object.keys(self.clients));
-//            console.log('events', client.connection._events)
-            if (token) {
-                delete self.clients[token];
-            }
+//        console.log('onClientConnectionDead events', client.connection._events, client._events);
+        if (token) {
+            delete self.clients[token];
         }
+    }
 
-        /**
-         * socket close event handler
-         * @function
-         * @param {Number} code
-         */
-        function onClose(code) {
-            //соединение разорвал клиент
-            this.removeListener('message', onMessage);
-            this.removeListener('error', onError);
-            this.removeListener('unbind', onUnbind);
-            this.emit('unbind');
-            clearTimeout(client.pingTimeoutHandle);
-            delete client.pingTimeoutHandle;
-            //   delete client.profile;
-            delete client.connection;
-            //          console.log('onClose',token)
-            if (token) {
-//                delete self.clients[token];
-                delete self.clients[token];
-            }
-            //       console.log('events', client.connection._events)
-            console.log(self.constructor.name, 'close', Object.keys(self.clients));
-        }
 
-        /**
-         * socket error event handler
-         * @function
-         * @param {Object} err error message object
-         */
-        function onError(err) {
-            //соединение разорвал клиент
-            this.removeListener('close', onClose);
-            this.removeListener('unbind', onUnbind);
-            this.removeListener('message', onMessage);
-            if (token) {
-                delete self.clients[token];
-            }
-        }
-
-        /**
-         * incoming socket data handler
-         * @function
-         * @param {String} message
-         */
-        function onMessage(message) {
-            var msg;
-            try {
-                msg = JSON.parse(message);
-            } catch
-                (e) {
-                this.close(1000);
-                return;
-            }
-            if (typeof self.commands[msg.cmd] == 'function') {
-                self.commands[msg.cmd](client, msg);
-            } else {
-                client.send({cmd: 'error', code: 'not supported', data: msg.cmd});
-            }
+    /**
+     * пришла команда из сокета(это не response)
+     * @function
+     * @param {Object} msg
+     */
+    function onClientMessage(msg) {
+        //console.log(msg)
+        if (typeof self.commands[msg.cmd] == 'function') {
+            self.commands[msg.cmd](client, msg);
+        } else {
+            //чтобы у клиента не висели коллбеки, подставляем ид запроса(если есть)
+            client.send({cmd: 'error', code: 'not supported', data: msg.cmd, __: msg.__});
         }
     }
 };
@@ -158,11 +116,14 @@ Protocol.prototype.listenToClient = function (client) {
  */
 Protocol.prototype.unbindClient = function (client, eventName) {
 //принимает клиента, отписывается от его событий и удаляет ссылки на него
-    client.connection.emit('unbind');   //чистим ссылки внитри текущего инстанса протокола
     if (eventName) {
+        client.removeAllListeners();
+  //      console.log(this.constructor.name, "unbind", Object.keys(client._events), Object.keys(client.connection._events))
         this.emit(eventName, client);
-    } else {
-        client.close(1000);
+    } else {    //если не передаем имя события, это значит что клиент не нужен и его надо отсоединить
+        client.connection.close(1000);
+        //обработчики событий чистятся в onClientConnectionDead()
+//        console.log(this.constructor.name, "unbindClient", client.connection._events);
     }
 };
 Protocol.prototype.broadcast = function (cmd) {
@@ -171,6 +132,5 @@ Protocol.prototype.broadcast = function (cmd) {
     }
 }
 
-Protocol.prototype.CMD_TWICE_LOGIN
 module.exports = Protocol;
 

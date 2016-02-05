@@ -1,24 +1,29 @@
 {
   "name": "Protocol",
-  "version": "0.2.4",
+  "version": "0.4.4",
   "main": "index.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1"
   },
-    "repository": {
-        "type": "git",
-        "url": "git@github.com:mint-lemon-eucalyptus/oge.Protocol.git"
-    },
-    "author": "mint-lemon",
-    "license": "ISC",
-    "bugs": {
-        "url": "https://github.com/mint-lemon-eucalyptus/oge.Protocol/issues"
-    },
-    "homepage": "https://github.com/mint-lemon-eucalyptus/oge.Protocol",
+  "repository": {
+    "type": "git",
+    "url": "git@github.com:mint-lemon-eucalyptus/oge.Protocol.git"
+  },
+  "author": {
+    "name": "mint-lemon"
+  },
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/mint-lemon-eucalyptus/oge.Protocol/issues"
+  },
+  "homepage": "https://github.com/mint-lemon-eucalyptus/oge.Protocol",
   "dependencies": {},
   "dist": {
     "shasum": "f15a3980f0fc2950dba01326f0eb74c27f107a51"
   },
-  "_resolved": "git+https://github.com/mint-lemon-eucalyptus/Oge/WsClient.git#c045bbc23924ae7085053ff86636396c10accc80",
-  "_from": "module-loader@git+https://github.com/mint-lemon-eucalyptus/Oge/WsClient.git"
+  "_resolved": "git+https://github.com/mint-lemon-eucalyptus/oge.Protocol.git#4bd95bbcaa133f294caec14fe609930ed511aa6c",
+  "_from": "module-loader@git+https://github.com/mint-lemon-eucalyptus/Oge/WsClient.git",
+  "readme": "ERROR: No README data found!",
+  "_id": "Protocol@0.2.4",
+  "_shasum": "994dc21ecfd53fa5a9b706e2e9d3261934e05201"
 }
