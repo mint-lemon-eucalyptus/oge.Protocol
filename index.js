@@ -104,8 +104,10 @@ Protocol.prototype.listenToClient = function (client) {
             //   delete client.profile;
             delete client.connection;
             //          console.log('onClose',token)
+            for (var cbId in client.__callbacks) {
+                client.__callbacks[cbId](code);
+            }
             if (token) {
-//                delete self.clients[token];
                 delete self.clients[token];
             }
             //       console.log('events', client.connection._events)
@@ -122,6 +124,9 @@ Protocol.prototype.listenToClient = function (client) {
             this.removeListener('close', onClose);
             this.removeListener('unbind', onUnbind);
             this.removeListener('message', onMessage);
+            for (var cbId in client.__callbacks) {
+                client.__callbacks[cbId](code);
+            }
             if (token) {
                 delete self.clients[token];
             }
