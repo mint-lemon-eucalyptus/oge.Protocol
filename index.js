@@ -149,7 +149,7 @@ Protocol.prototype.listenToClient = function (client) {
 
             var reqId = msg.__;
             var callback = client.__callbacks[reqId];
-            console.log('received', msg);
+//            console.log('received', msg);
             if (callback) {  //коллбек остался, подставим туда данные
                 delete msg.__;
                 callback(null, msg);
