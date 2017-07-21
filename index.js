@@ -162,7 +162,9 @@ Protocol.prototype.listenToClient = function (client) {
                     self.commands[cmdName](client, msg);    //тут надо передать контекст
                 }
                 else {
-                    client.send({cmd: 'error', code: 'not supported', data: msg.cmd});
+                    if (typeof self.onNotSupportedCommand === "function") {
+                        self.onNotSupportedCommand(client, msg);
+                    }
                 }
             }
         }
